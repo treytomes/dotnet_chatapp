@@ -7,4 +7,12 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.BedrockRuntime" Version="3.7.404.4" />
+    <PackageReference Include="AWSSDK.Core" Version="3.7.400.32" />
+    <PackageReference Include="AWSSDK.SSO" Version="3.7.400.32" />
+    <PackageReference Include="AWSSDK.SSOOIDC" Version="3.7.400.32" />
+    <PackageReference Include="Microsoft.SemanticKernel" Version="1.22.0" />
+  </ItemGroup>
+
 </Project>
