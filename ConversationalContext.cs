@@ -151,43 +151,4 @@ namespace chatapp
 			};
 		}
 	}
-	internal class Program
-	{
-		private ConversationalContext context = new ConversationalContext();
-
-		internal Program()
-		{
-			context.RegisterTool((TopSongRequest request) => new TopSongResponse("My Fav Song", "The Awesome Songers"));
-		}
-
-		static async Task Main()
-		{
-			await (new Program()).Start();
-		}
-
-		private async Task Start()
-		{
-			var conversation = new Conversation();
-
-			// Q&A loop
-			while (true)
-			{
-				var userMessage = GetUserMessage();
-				var response = await context.GetResponse(userMessage);
-			}
-		}
-
-		private string GetUserMessage()
-		{
-			while (true)
-			{
-				Console.Write("> ");
-				var userMessage = Console.ReadLine();
-				if (userMessage != null)
-				{
-					return userMessage;
-				}
-			}
-		}
-	}
 }
