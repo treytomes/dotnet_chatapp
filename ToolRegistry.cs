@@ -48,7 +48,7 @@ namespace chatapp
 				if (toolInfo.Name == toolName)
 				{
 					var toolData = ToolHelpers.ParseToolRequest(payload, toolInfo.RequestType);
-					var toolResult = new TopSongResponse("My Fav Song", "The Singers");
+					var toolResult = toolInfo.Invoke(toolData);
 					//Console.WriteLine($"toolData: {toolData}");
 					var toolResponse = new ToolResultBlock
 					{

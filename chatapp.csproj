@@ -12,6 +12,7 @@
     <PackageReference Include="AWSSDK.Core" Version="3.7.400.32" />
     <PackageReference Include="AWSSDK.SSO" Version="3.7.400.32" />
     <PackageReference Include="AWSSDK.SSOOIDC" Version="3.7.400.32" />
+    <PackageReference Include="Build5Nines.SharpVector" Version="1.0.0" />
     <PackageReference Include="Microsoft.SemanticKernel" Version="1.22.0" />
   </ItemGroup>
 

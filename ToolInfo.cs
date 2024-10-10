@@ -19,7 +19,7 @@ namespace chatapp
 		public static ToolInfo Create<TRequest, TResponse>(Func<TRequest, TResponse> invoke)
 		{
 			Func<object, object> invokeWrapper = (object request) => invoke((TRequest)request)!;
-			return new ToolInfo(ToolHelpers.GenerateToolSpec<TRequest>(), typeof(TRequest), invokeWrapper));
+			return new ToolInfo(ToolHelpers.GenerateToolSpec<TRequest>(), typeof(TRequest), invokeWrapper);
 		}
 
 		public string Name

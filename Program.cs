@@ -1,163 +1,51 @@
-﻿using Amazon.BedrockRuntime;
-using Amazon.BedrockRuntime.Model;
-using System.Text;
+﻿using Build5Nines.SharpVector;
+using Build5Nines.SharpVector.Data;
+using System.Net;
+using System.Text.RegularExpressions;
+
+// SharpVector Examples: https://github.com/Build5Nines/SharpVector
 
 namespace chatapp
 {
-	internal class ConversationalContext
-	{
-		private readonly InferenceConfiguration inferenceConfig = new InferenceConfiguration()
-		{
-			MaxTokens = 512,
-			Temperature = 0.5f,
-			TopP = 0.9f
-		};
-
-		private readonly ToolRegistry Tools = new ToolRegistry();
-		private readonly Conversation conversation = new Conversation();
-		private readonly AmazonBedrockRuntimeClient client = Authentication.GetBedrockClient(Settings.AWS_PROFILE_NAME);
-
-		public void RegisterTool<TToolRequest, TToolResponse>(Func<TToolRequest, TToolResponse> invoke)
-		{
-			Tools.Register(invoke);
-		}
-
-		public async Task<PromptResult> GetResponse(string userMessage = "", bool echo = true)
-		{
-			// Extract and print the streamed response text in real-time.
-			var sbText = new StringBuilder();
-			var toolName = string.Empty;
-			var toolUseId = string.Empty;
-			var sbTool = new StringBuilder();
-			var stopReason = StopReason.End_turn;
-
-			// Create a request with the model ID, the user message, and an inference configuration.
-			var request = CreateRequest(conversation, userMessage);
-
-			try
-			{
-				// Send the request to the Bedrock Runtime and wait for the result.
-				var response = await client.ConverseStreamAsync(request);
-
-				// e.g. What is the most popular song on WZPZ?
-				foreach (var chunk in response.Stream.AsEnumerable())
-				{
-					switch (chunk)
-					{
-						case ContentBlockDeltaEvent e0:
-							if (e0.Delta.ToolUse != null)
-							{
-								sbTool.Append(e0.Delta.ToolUse.Input);
-							}
-							if (e0.Delta.Text != null)
-							{
-								sbText.Append(e0.Delta.Text);
-								if (echo)
-								{
-									Console.Write(e0.Delta.Text);
-								}
-							}
-							//Console.WriteLine("Content block delta:");
-							//Console.WriteLine("\tTool use: {0}", e.Delta.ToolUse.Input);
-							//Console.WriteLine("\tText: {0}", e.Delta.Text);
-							break;
-						case MessageStartEvent e1:
-							//Console.WriteLine($"Message start: {e1.Role}");
-							break;
-						case MessageStopEvent e2:
-							stopReason = e2.StopReason;
-							//Console.WriteLine("Message stop reason: {0}", e.StopReason);
-							//Console.WriteLine("\tAdditional fields: {0}", e.AdditionalModelResponseFields);
-							break;
-						case ContentBlockStartEvent e3:
-							//Console.WriteLine("Content block start:");
-							//Console.WriteLine($"\tBlock index: {e.ContentBlockIndex}");
-							if (e3.Start.ToolUse != null)
-							{
-								//Console.WriteLine($"Tool use id: {e.Start.ToolUse.ToolUseId}");
-								//Console.WriteLine($"Tool name: {e.Start.ToolUse.Name}");
-								toolName = e3.Start.ToolUse.Name;
-								toolUseId = e3.Start.ToolUse.ToolUseId;
-							}
-							break;
-						case ContentBlockStopEvent e4:
-							//Console.WriteLine("Content block stop:");
-							//Console.WriteLine($"\tBlock index: {e.ContentBlockIndex}");
-							break;
-						case ConverseStreamMetadataEvent e5:
-							//Logger.Log(chunk as ConverseStreamMetadataEvent);
-							break;
-						default:
-							throw new Exception($"Unknown chunk type: {chunk.GetType().Name}");
-					}
-				}
-				Console.WriteLine();
-
-				//Console.WriteLine($"stopReason: {stopReason}");
-				if (sbText.Length > 0)
-				{
-					conversation.AddAssistantMessage(sbText.ToString());
-				}
-				if (sbTool.Length > 0)
-				{
-					//Console.WriteLine($"tool: {toolName} = {sbTool}");
-					conversation.AddToolUse(Tools.ParseToolUse(toolName, toolUseId, sbTool.ToString()));
-					var toolResult = Tools.InvokeTool(toolName, toolUseId, sbTool.ToString());
-					conversation.AddToolResult(toolResult);
-
-					// Shove the tool result into the conversation and keep going.
-					return await GetResponse();
-				}
-			}
-			catch (AmazonBedrockRuntimeException e)
-			{
-				Console.WriteLine($"ERROR: Can't invoke '{Settings.MODEL_ID}'. Reason: {e.Message}");
-				throw;
-			}
-			catch (Exception e)
-			{
-				Console.WriteLine(e);
-			}
-
-			Console.WriteLine();
-
-			return new PromptResult(stopReason, sbText.ToString(), toolName, toolUseId, sbTool.ToString());
-		}
-
-		private ConverseStreamRequest CreateRequest(Conversation conversation, string userMessage = "")
-		{
-			if (userMessage.Length > 0)
-			{
-				conversation.AddUserMessage(userMessage);
-			}
-			return new ConverseStreamRequest
-			{
-				ModelId = Settings.MODEL_ID,
-				Messages = conversation.messages,
-				InferenceConfig = inferenceConfig,
-				ToolConfig = new ToolConfiguration()
-				{
-					ToolChoice = new ToolChoice()
-					{
-						//Any = new AnyToolChoice(),
-						Auto = new AutoToolChoice(),
-						//Tool = new SpecificToolChoice()
-						//{
-						//	Name = "top_song"
-						//}
-					},
-					Tools = Tools.Tools
-				}
-			};
-		}
-	}
 	internal class Program
 	{
 		private ConversationalContext context = new ConversationalContext();
+		private BasicMemoryVectorDatabase dotNetInfoDb = new BasicMemoryVectorDatabase();
 
 		internal Program()
 		{
 			context.RegisterTool((TopSongRequest request) => new TopSongResponse("My Fav Song", "The Awesome Songers"));
+
+			context.RegisterTool((DotNetInfoRequest request) =>
+			{
+				const int PAGE_COUNT = 5;
+
+				Console.WriteLine($"Searching for .NET info on: {request.question}");
+
+				// Perform a Vector Search
+				var result = dotNetInfoDb.Search(request.question, pageCount: PAGE_COUNT);
+
+				//if (!result.IsEmpty)
+				//{
+				//	Console.WriteLine("Similar Text Found:");
+				//	foreach (var item in result.Texts)
+				//	{
+				//		Console.WriteLine("{0} - {1} - {2}", item.VectorComparison, item.Metadata, item.Text);
+				//	}
+				//}
+
+				if (result.IsEmpty)
+				{
+					return new DotNetInfoResponse(new[]
+					{
+						new VectorTextResponse("I don't know.", string.Empty)
+					});
+				}
+				else
+				{
+					return new DotNetInfoResponse(result.Texts.Select(x => new VectorTextResponse(x.Text, x.Metadata ?? string.Empty)));
+				}
+			});
 		}
 
 		static async Task Main()
@@ -165,11 +53,70 @@ namespace chatapp
 			await (new Program()).Start();
 		}
 
+		private async Task Initialize()
+		{
+			// Download a document and add all of its contents to our .NET info db.
+			using (HttpClient client = new())
+			{
+				// It's loaded full of yucky JavaScript! :-(
+				var document = await client.GetStringAsync("https://devblogs.microsoft.com/dotnet/performance_improvements_in_net_7");
+				document = WebUtility.HtmlDecode(Regex.Replace(document, @"<[^>]+>|&nbsp;", ""));
+				
+				// It's a big document; loading it all as one big text blob misses the point of vectorizing the thing.
+				//vectorDb.AddText(s);
+
+				/// Paragraph Chunking
+				var loader = new TextDataLoader<int, string>(dotNetInfoDb);
+				loader.AddDocument(document, new TextChunkingOptions<string>
+				{
+					Method = TextChunkingMethod.Paragraph,
+					RetrieveMetadata = (chunk) => {
+						// add some basic metadata since this can't be null
+						return "{ chuckSize: \"" + chunk.Length + "\" }";
+					}
+				});
+			}
+		}
+
 		private async Task Start()
 		{
-			var conversation = new Conversation();
+			await Initialize();
 
-			// Q&A loop
+			//var input = "What has changed in .NET 7?";
+			//var documents = new[]
+			//{
+			//	"What is an amphibian?",
+			//	"Cos'è un anfibio?",
+			//	"A frog is an amphibian.",
+			//	"Frogs, toads, and salamanders are all examples.",
+			//	"Amphibians are four-limbed and ectothermic vertebrates of the class Amphibia.",
+			//	"They are four-limbed and ectothermic vertebrates.",
+			//	"A frog is green.",
+			//	"A tree is green.",
+			//	"It's not easy bein' green.",
+			//	"A dog is a mammal.",
+			//	"A dog is a man's best friend.",
+			//	"You ain't never had a friend like me.",
+			//	"Rachel, Monica, Phoebe, Joey, Chandler, Ross",
+			//};
+
+			// Index the documents
+			//foreach (var doc in documents)
+			//{
+			//	vectorDb.AddText(doc);
+			//}
+
+			//context.AddUserMessage("You are an AI assistant that helps people find information.");
+
+			//// Download a document and add all of its contents to our chat
+			//using (HttpClient client = new())
+			//{
+			//	string s = await client.GetStringAsync("https://devblogs.microsoft.com/dotnet/performance_improvements_in_net_7");
+			//	s = WebUtility.HtmlDecode(Regex.Replace(s, @"<[^>]+>|&nbsp;", ""));
+			//	context.AddUserMessage("Here's some additional information: " + s); // uh oh!
+			//	//context.AddUserMessage("Generative Engine Optimization (GEO) is the act of optimizing web content for consumption by a large language model.");
+			//}
+
 			while (true)
 			{
 				var userMessage = GetUserMessage();

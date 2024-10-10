@@ -11,5 +11,4 @@ namespace chatapp
 		[Required]
 		public required string sign { get; set; }
 	}
-
 }

@@ -22,6 +22,11 @@ namespace chatapp
 			Tools.Register(invoke);
 		}
 
+		public void AddUserMessage(string userMessage)
+		{
+			conversation.AddUserMessage(userMessage);
+		}
+
 		public async Task<PromptResult> GetResponse(string userMessage = "", bool echo = true)
 		{
 			// Extract and print the streamed response text in real-time.
